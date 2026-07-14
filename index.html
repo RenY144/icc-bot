@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ICC Bot">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0a0f1a">
+    <meta name="description" content="ICC Strategy Trading Bot - XAUUSD & GBPJPY">
+    
+    <!-- Apple Touch Icon (Gold chart emoji) -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230a0f1a'/><text x='50' y='68' text-anchor='middle' font-size='55'>📈</text></svg>">
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <title>ICC Strategy Bot</title>
+    
+    <script src="https://s3.tradingview.com/tv.js"></script>
+    
+    <style>
+        :root {
+            --bg: #0a0f1a;
+            --card: #131b2e;
+            --accent: #2962ff;
+            --buy: #00e676;
+            --sell: #ff1744;
+            --warn: #ff9100;
+            --text: #e0e0e0;
+            --sub: #90a4ae;
+            --border: #1e2a3a;
+            --safe-bottom: env(safe-area-inset-bottom, 10px);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            padding: 10px;
+            padding-bottom: var(--safe-bottom);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .app {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        /* Install Prompt */
+        .install-prompt {
+            background: linear-gradient(135deg, #2962ff, #00e5ff);
+            color: white;
+            padding: 14px 18px;
+            border-radius: 16px;
+            margin: 8px 0 12px;
+            display: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-align: center;
+            animation: slideDown 0.3s ease;
+            box-shadow: 0 4px 20px rgba(41,98,255,0.4);
+        }
+        
+        .install-prompt.show {
+            display: block;
+        }
+        
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 10px 0;
+            position: sticky;
+            top: 0;
+            background: rgba(10,15,26,0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 10;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .header h1 {
+            font-size: 1.3em;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        
+        .header .gradient-text {
+            background: linear-gradient(135deg, #2962ff, #00e5ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header .status-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        
+        .mini-badge {
+            font-size: 0.6em;
+            padding: 3px 8px;
+            border-radius: 8px;
+            letter-spacing: 0.5px;
+        }
+        
+        .mini-badge.live {
+            background: rgba(0,230,118,0.15);
+            color: #00e676;
+        }
+        
+        .mini-badge.demo {
+            background: rgba(255,145,0,0.15);
+            color: #ff9100;
+        }
+        
+        /* Connection Bar */
+        .conn-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            margin: 8px 0;
+            font-size: 0.8em;
+        }
+        
+        .conn-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff1744;
+            flex-shrink: 0;
+        }
+        
+        .conn-dot.online {
+            background: #00e676;
+            box-shadow: 0 0 8px rgba(0,230,118,0.5);
+            animation: glowPulse 2s infinite;
+        }
+        
+        @keyframes glowPulse {
+            0%, 100% { box-shadow: 0 0 4px rgba(0,230,118,0.3); }
+            50% { box-shadow: 0 0 12px rgba(0,230,118,0.6); }
+        }
+        
+        .conn-bar .conn-text {
+            flex: 1;
+            color: var(--sub);
+        }
+        
+        .conn-bar .conn-action {
+            color: var(--accent);
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        /* API Setup */
+        .setup-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            margin: 8px 0;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .setup-section.collapsed .setup-body {
+            display: none;
+        }
+        
+        .setup-header {
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .setup-header .arrow {
+            transition: transform 0.3s;
+            font-size: 0.7em;
+        }
+        
+        .setup-section.collapsed .arrow {
+            transform: rotate(-90deg);
+        }
+        
+        .setup-body {
+            padding: 0 14px 14px;
+        }
+        
+        .setup-body input {
+            width: 100%;
+            padding: 10px;
+            margin: 6px 0;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.85em;
+            -webkit-appearance: none;
+        }
+        
+        .setup-body input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .btn {
+            padding: 11px 16px;
+            border-radius: 22px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.15s;
+            letter-spacing: 0.3px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+            opacity: 0.8;
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            flex: 1;
+        }
+        
+        .btn-success {
+            background: #00e676;
+            color: #000;
+            flex: 1;
+        }
+        
+        .btn-danger {
+            background: #ff1744;
+            color: white;
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        
+        .help-link {
+            font-size: 0.65em;
+            color: var(--accent);
+            margin-top: 6px;
+            display: block;
+            text-decoration: none;
+        }
+        
+        /* Alert Overlay */
+        .alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 12px;
+            display: none;
+        }
+        
+        .alert-overlay.active {
+            display: block;
+            animation: alertIn 0.3s ease;
+        }
+        
+        @keyframes alertIn {
+            from { transform: translateY(-100%); }
+            to { transform: translateY(0); }
+        }
+        
+        .alert-card {
+            background: var(--card);
+            border: 2px solid var(--warn);
+            border-radius: 16px;
+            padding: 16px;
+            position: relative;
+            animation: alertGlow 1s infinite alternate;
+        }
+        
+        .alert-card.buy {
+            border-color: #00e676;
+            background: linear-gradient(135deg, #1b5e2015, #0a0f1a);
+        }
+        
+        .alert-card.sell {
+            border-color: #ff1744;
+            background: linear-gradient(135deg, #b71c1c15, #0a0f1a);
+        }
+        
+        @keyframes alertGlow {
+            from { box-shadow: 0 0 20px rgba(255,145,0,0.3); }
+            to { box-shadow: 0 0 40px rgba(255,145,0,0.6); }
+        }
+        
+        .alert-card .close-alert {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: var(--sub);
+            font-size: 1.3em;
+            cursor: pointer;
+            padding: 4px;
+        }
+        
+        .alert-card .alert-symbol {
+            font-size: 2.5em;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        
+        .alert-card .alert-pair {
+            font-size: 1.4em;
+            font-weight: 800;
+            text-align: center;
+        }
+        
+        .alert-card .alert-signal {
+            font-size: 1.1em;
+            font-weight: 700;
+            text-align: center;
+            margin: 4px 0;
+        }
+        
+        .alert-card .alert-conditions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 8px 0;
+            font-size: 0.75em;
+        }
+        
+        .alert-card .alert-price {
+            text-align: center;
+            font-size: 0.9em;
+            color: var(--sub);
+        }
+        
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            gap: 8px;
+            margin: 8px 0;
+        }
+        
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 8px;
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 6px;
+            margin-bottom: 4px;
+        }
+        
+        .chart-header .pair-label {
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        
+        .chart-header .live-bid {
+            font-size: 0.8em;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 250px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Signal Indicators */
+        .signals-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 8px 0;
+        }
+        
+        .signal-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            transition: border-color 0.3s;
+        }
+        
+        .signal-card.hot {
+            border-color: var(--warn);
+        }
+        
+        .signal-card h4 {
+            font-size: 0.8em;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .condition-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7em;
+            padding: 3px 0;
+        }
+        
+        .condition-line .check {
+            font-size: 1em;
+            width: 16px;
+            text-align: center;
+        }
+        
+        .condition-line.met { color: #00e676; }
+        .condition-line.pending { color: #ff9100; }
+        
+        .conf-bar {
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        
+        .conf-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.4s;
+        }
+        
+        /* Controls */
+        .control-bar {
+            display: flex;
+            gap: 6px;
+            margin: 8px 0;
+        }
+        
+        .control-btn {
+            flex: 1;
+            padding: 14px 8px;
+            border-radius: 25px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.75em;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+            letter-spacing: 0.3px;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.94);
+        }
+        
+        .control-btn.start {
+            background: #00e676;
+            color: #000;
+        }
+        
+        .control-btn.stop {
+            background: #ff1744;
+            color: white;
+        }
+        
+        .control-btn.test {
+            background: var(--accent);
+            color: white;
+        }
+        
+        .control-btn:disabled {
+            opacity: 0.35;
+        }
+        
+        /* Log */
+        .log-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            font-size: 0.65em;
+        }
+        
+        .log-box h5 {
+            font-family: -apple-system, sans-serif;
+            font-size: 0.8em;
+            margin-bottom: 6px;
+            color: var(--sub);
+        }
+        
+        .log-line {
+            padding: 3px 0;
+            color: var(--sub);
+            border-bottom: 1px solid rgba(255,255,255,0.02);
+        }
+        
+        .log-line.alert { color: #ff9100; font-weight: 700; }
+        .log-line.error { color: #ff1744; }
+        .log-line.ok { color: #00e676; }
+        
+        /* Loading Spinner */
+        .spinner-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .spinner-overlay.show {
+            display: flex;
+        }
+        
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.8em;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
+        /* Mobile Optimizations */
+        @media (max-width: 370px) {
+            .signals-row { grid-template-columns: 1fr; }
+            .chart-container { height: 200px; }
+            .control-btn { padding: 12px 6px; font-size: 0.7em; }
+            .header h1 { font-size: 1.1em; }
+        }
+        
+        @media (min-width: 420px) {
+            .chart-container { height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Install Prompt -->
+        <div class="install-prompt" id="installPrompt" onclick="installApp()">
+            📲 Tap here to <b>Install App</b> on your home screen
+        </div>
+        
+        <!-- Header -->
+        <div class="header">
+            <h1><span class="gradient-text">🎯 ICC Strategy Bot</span></h1>
+            <div class="status-row">
+                <span class="mini-badge live" id="statusBadge">● IDLE</span>
+                <span class="mini-badge demo">OANDA DEMO</span>
+                <span class="mini-badge" id="scanBadge">0 scans</span>
+            </div>
+        </div>
+        
+        <!-- Connection Status -->
+        <div class="conn-bar">
+            <span class="conn-dot" id="connDot"></span>
+            <span class="conn-text" id="connText">Not connected</span>
+            <span class="conn-action" onclick="toggleSetup()">Setup ▾</span>
+        </div>
+        
+        <!-- API Setup -->
+        <div class="setup-section" id="setupSection">
+            <div class="setup-header" onclick="toggleSetup()">
+                🔑 OANDA API Setup
+                <span class="arrow">▾</span>
+            </div>
+            <div class="setup-body">
+                <input type="text" id="apiKey" placeholder="Paste OANDA API Key">
+                <input type="text" id="accountId" placeholder="Paste Account ID">
+                <div class="btn-row">
+                    <button class="btn btn-primary" onclick="connectOANDA()">🔗 Connect</button>
+                </div>
+                <a class="help-link" href="https://www.oanda.com/demo-account/" target="_blank" rel="noopener">
+                    📝 Get free demo account →
+                </a>
+            </div>
+        </div>
+        
+        <!-- Alert Overlay -->
+        <div class="alert-overlay" id="alertOverlay">
+            <div class="alert-card" id="alertCard">
+                <button class="close-alert" onclick="dismissAlert()">✕</button>
+                <div class="alert-symbol" id="alertSymbol">📈</div>
+                <div class="alert-pair" id="alertPair">XAUUSD</div>
+                <div class="alert-signal" id="alertSignal">BUY SIGNAL</div>
+                <div class="alert-conditions">
+                    <span>✅ EMA</span><span>✅ HA</span><span>✅ Stoch</span>
+                </div>
+                <div class="alert-price" id="alertPrice">Entry: 2650.50</div>
+            </div>
+        </div>
+        
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <span class="pair-label">🥇 XAUUSD</span>
+                    <span class="live-bid" id="xauusdBid">--</span>
+                </div>
+                <div class="chart-container" id="xauusdChart"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <span class="pair-label">💱 GBPJPY</span>
+                    <span class="live-bid" id="gbpjpyBid">--</span>
+                </div>
+                <div class="chart-container" id="gbpjpyChart"></div>
+            </div>
+        </div>
+        
+        <!-- Signal Status -->
+        <div class="signals-row">
+            <div class="signal-card" id="xauusdSignal">
+                <h4>XAUUSD <span id="xauusdDir">⏳ Waiting</span></h4>
+                <div id="xauusdConds"></div>
+                <div class="conf-bar"><div class="conf-fill" id="xauusdConf" style="width:0%"></div></div>
+            </div>
+            <div class="signal-card" id="gbpjpySignal">
+                <h4>GBPJPY <span id="gbpjpyDir">⏳ Waiting</span></h4>
+                <div id="gbpjpyConds"></div>
+                <div class="conf-bar"><div class="conf-fill" id="gbpjpyConf" style="width:0%"></div></div>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="control-bar">
+            <button class="control-btn start" id="btnStart" onclick="startBot()" disabled>▶ START</button>
+            <button class="control-btn stop" id="btnStop" onclick="stopBot()" disabled>⏹ STOP</button>
+            <button class="control-btn test" onclick="testAlert()">🔔 TEST</button>
+        </div>
+        
+        <!-- Log -->
+        <div class="log-box">
+            <h5>📋 Log</h5>
+            <div id="logContent">
+                <div class="log-line">🟢 App ready. Connect API to begin.</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Spinner -->
+    <div class="spinner-overlay" id="spinner">
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        // ============================================
+        // PWA INSTALL HANDLER
+        // ============================================
+        
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installPrompt').classList.add('show');
+        });
+        
+        window.addEventListener('appinstalled', () => {
+            document.getElementById('installPrompt').classList.remove('show');
+            addLog('✅ App installed on home screen!', 'ok');
+            showToast('App installed! 🎉');
+        });
+        
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((result) => {
+                    if (result.outcome === 'accepted') {
+                        addLog('📲 Installing app...', 'ok');
+                    }
+                    deferredPrompt = null;
+                    document.getElementById('installPrompt').classList.remove('show');
+                });
+            } else {
+                const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+                if (isIOS) {
+                    showToast('📱 Tap Share → Add to Home Screen');
+                } else {
+                    showToast('📱 Open in Chrome → Menu → Install');
+                }
+            }
+        }
+        
+        // Check if already standalone
+        if (window.matchMedia('(display-mode: standalone)').matches || 
+            (typeof navigator.standalone !== 'undefined' && navigator.standalone)) {
+            document.getElementById('installPrompt').classList.remove('show');
+        }
+        
+        // ============================================
+        // TOAST
+        // ============================================
+        
+        function showToast(message, duration = 2500) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+        
+        // ============================================
+        // OANDA CONFIG
+        // ============================================
+        
+        const OANDA = {
+            apiKey: '',
+            accountId: '',
+            baseUrl: 'https://api-fxpractice.oanda.com/v3',
+            pairs: ['XAU_USD', 'GBP_JPY'],
+            connected: false,
+            pollMs: 5000,
+        };
+        
+        const STATE = {
+            running: false,
+            timer: null,
+            prices: {},
+            candles: {},
+            scans: 0,
+            alerts: 0,
+        };
+        
+        // ============================================
+        // SETUP UI
+        // ============================================
+        
+        function toggleSetup() {
+            document.getElementById('setupSection').classList.toggle('collapsed');
+        }
+        
+        function loadSavedCreds() {
+            const key = localStorage.getItem('icc_oanda_key');
+            const id = localStorage.getItem('icc_oanda_id');
+            if (key) document.getElementById('apiKey').value = key;
+            if (id) document.getElementById('accountId').value = id;
+            if (key && id) {
+                addLog('📝 Saved credentials found', 'ok');
+            }
+        }
+        
+        // ============================================
+        // OANDA CONNECTION
+        // ============================================
+        
+        async function connectOANDA() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const accountId = document.getElementById('accountId').value.trim();
+            
+            if (!apiKey || !accountId) {
+                showToast('Enter API Key & Account ID');
+                return;
+            }
+            
+            showSpinner(true);
+            addLog('🔗 Testing OANDA connection...', 'info');
+            
+            OANDA.apiKey = apiKey;
+            OANDA.accountId = accountId;
+            
+            try {
+                const res = await fetch(`${OANDA.baseUrl}/accounts/${accountId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    OANDA.connected = true;
+                    
+                    document.getElementById('connDot').classList.add('online');
+                    document.getElementById('connText').textContent = 
+                        `Connected • ${data.account.currency} ${data.account.balance}`;
+                    document.getElementById('statusBadge').textContent = '● ONLINE';
+                    document.getElementById('statusBadge').style.color = '#00e676';
+                    document.getElementById('btnStart').disabled = false;
+                    
+                    localStorage.setItem('icc_oanda_key', apiKey);
+                    localStorage.setItem('icc_oanda_id', accountId);
+                    
+                    initCharts();
+                    
+                    addLog(`✅ Connected! Balance: ${data.account.balance}`, 'ok');
+                    showToast('Connected! ✅');
+                    
+                    document.getElementById('setupSection').classList.add('collapsed');
+                    
+                } else {
+                    const err = await res.json();
+                    throw new Error(err.errorMessage || 'Auth failed');
+                }
+            } catch (e) {
+                addLog(`❌ Connection failed: ${e.message}`, 'error');
+                showToast('Connection failed ❌');
+                OANDA.connected = false;
+            }
+            
+            showSpinner(false);
+        }
+        
+        // ============================================
+        // OANDA DATA
+        // ============================================
+        
+        async function fetchPrices() {
+            if (!OANDA.connected) return null;
+            
+            try {
+                const res = await fetch(
+                    `${OANDA.baseUrl}/accounts/${OANDA.accountId}/pricing?instruments=${OANDA.pairs.join(',')}`,
+                    { headers: { 'Authorization': `Bearer ${OANDA.apiKey}` } }
+                );
+                
+                if (!res.ok) throw new Error('Price fetch failed');
+                
+                const data = await res.json();
+                const prices = {};
+                
+                for (const p of data.prices) {
+                    const name = p.instrument === 'XAU_USD' ? 'XAUUSD' : 'GBPJPY';
+                    prices[name] = {
+                        bid: parseFloat(p.bids[0].price),
+                        ask: parseFloat(p.asks[0].price),
+                        mid: (parseFloat(p.bids[0].price) + parseFloat(p.asks[0].price)) / 2,
+                        spread: parseFloat(p.asks[0].price) - parseFloat(p.bids[0].price),
+                        time: new Date(p.time)
+                    };
+                    STATE.prices[name] = prices[name];
+                }
+                
+                return prices;
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        async function fetchCandles(pair, count = 30) {
+            if (!OANDA.connected) return null;
+            
+            const inst = pair === 'XAUUSD' ? 'XAU_USD' : 'GBP_JPY';
+            
+            try {
+                const res = await fetch(
+                    `${OANDA.baseUrl}/accounts/${OANDA.accountId}/instruments/${inst}/candles?` +
+                    `granularity=M1&count=${count}&price=M`,
+                    { headers: { 'Authorization': `Bearer ${OANDA.apiKey}` } }
+                );
+                
+                if (!res.ok) throw new Error('Candle fetch failed');
+                
+                const data = await res.json();
+                const candles = data.candles.map(c => ({
+                    time: new Date(c.time),
+                    open: parseFloat(c.mid.o),
+                    high: parseFloat(c.mid.h),
+                    low: parseFloat(c.mid.l),
+                    close: parseFloat(c.mid.c),
+                    volume: c.volume
+                }));
+                
+                STATE.candles[pair] = candles;
+                return candles;
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        // ============================================
+        // ICC STRATEGY ENGINE
+        // ============================================
+        
+        function calcEMA(data, period) {
+            if (data.length < period) return null;
+            const k = 2 / (period + 1);
+            let ema = data[0].close;
+            for (let i = 1; i < data.length; i++) {
+                ema = data[i].close * k + ema * (1 - k);
+            }
+            return ema;
+        }
+        
+        function calcHeikenAshi(candles) {
+            if (candles.length < 2) return null;
+            const ha = [];
+            
+            ha.push({
+                close: (candles[0].open + candles[0].high + candles[0].low + candles[0].close) / 4,
+                open: (candles[0].open + candles[0].close) / 2,
+                high: candles[0].high,
+                low: candles[0].low,
+                color: candles[0].close >= candles[0].open ? 'green' : 'red'
+            });
+            
+            for (let i = 1; i < candles.length; i++) {
+                const haClose = (candles[i].open + candles[i].high + candles[i].low + candles[i].close) / 4;
+                const haOpen = (ha[i-1].open + ha[i-1].close) / 2;
+                ha.push({
+                    close: haClose,
+                    open: haOpen,
+                    high: Math.max(candles[i].high, haOpen, haClose),
+                    low: Math.min(candles[i].low, haOpen, haClose),
+                    color: haClose >= haOpen ? 'green' : 'red'
+                });
+            }
+            
+            return ha;
+        }
+        
+        function calcStochRSI(candles, rsiPeriod = 14, stochK = 5) {
+            if (candles.length < rsiPeriod + stochK) return null;
+            
+            const closes = candles.map(c => c.close);
+            let gains = 0, losses = 0;
+            
+            for (let i = closes.length - rsiPeriod; i < closes.length; i++) {
+                const change = closes[i] - closes[i-1];
+                if (change > 0) gains += change;
+                else losses -= change;
+            }
+            
+            const avgGain = gains / rsiPeriod;
+            const avgLoss = losses / rsiPeriod;
+            const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+            
+            const recentCloses = closes.slice(-stochK);
+            const highest = Math.max(...recentCloses);
+            const lowest = Math.min(...recentCloses);
+            const stoch = highest === lowest ? 50 : 
+                ((closes[closes.length-1] - lowest) / (highest - lowest)) * 100;
+            
+            return stoch;
+        }
+        
+        function analyzeICC(pair, candles) {
+            const result = {
+                pair, direction: null, confidence: 0, price: 0,
+                conds: { ema: false, ha: false, stoch: false },
+                details: {}
+            };
+            
+            if (!candles || candles.length < 25) return result;
+            
+            const ema21 = calcEMA(candles, 21);
+            const ha = calcHeikenAshi(candles);
+            const stoch = calcStochRSI(candles);
+            const prevCandles = candles.slice(0, -1);
+            const prevStoch = calcStochRSI(prevCandles);
+            
+            if (!ema21 || !ha || stoch === null) return result;
+            
+            const price = candles[candles.length-1].close;
+            result.price = price;
+            result.details.ema21 = ema21;
+            result.details.stoch = stoch;
+            result.details.haColor = ha[ha.length-1].color;
+            result.details.prevHaColor = ha.length > 1 ? ha[ha.length-2].color : null;
+            
+            result.conds.ema = Math.abs(price - ema21) / ema21 < 0.0015;
+            
+            if (ha.length >= 2) {
+                result.conds.ha = ha[ha.length-1].color !== ha[ha.length-2].color;
+            }
+            
+            if (stoch < 20 && prevStoch !== null && stoch > prevStoch) {
+                result.conds.stoch = 'oversold_rising';
+            } else if (stoch > 80 && prevStoch !== null && stoch < prevStoch) {
+                result.conds.stoch = 'overbought_falling';
+            }
+            
+            if (result.conds.ema && result.conds.ha) {
+                if (result.details.haColor === 'green' && result.conds.stoch === 'oversold_rising') {
+                    result.direction = 'BUY';
+                } else if (result.details.haColor === 'red' && result.conds.stoch === 'overbought_falling') {
+                    result.direction = 'SELL';
+                }
+            }
+            
+            if (result.direction) {
+                let score = 30 + 35 + 35;
+                if (result.conds.stoch === 'oversold_rising' && stoch < 15) score += 10;
+                if (result.conds.stoch === 'overbought_falling' && stoch > 85) score += 10;
+                result.confidence = Math.min(score, 100);
+            }
+            
+            return result;
+        }
+        
+        // ============================================
+        // MAIN SCAN LOOP
+        // ============================================
+        
+        async function scan() {
+            if (!STATE.running || !OANDA.connected) return;
+            
+            STATE.scans++;
+            document.getElementById('scanBadge').textContent = STATE.scans + ' scans';
+            
+            for (const oandaPair of OANDA.pairs) {
+                const pair = oandaPair === 'XAU_USD' ? 'XAUUSD' : 'GBPJPY';
+                
+                try {
+                    const candles = await fetchCandles(pair, 30);
+                    const prices = await fetchPrices();
+                    
+                    if (candles && prices && prices[pair]) {
+                        const bidEl = document.getElementById(pair.toLowerCase() + 'Bid');
+                        if (bidEl) {
+                            bidEl.textContent = prices[pair].bid.toFixed(pair === 'XAUUSD' ? 2 : 3);
+                        }
+                        
+                        const signal = analyzeICC(pair, candles);
+                        updateSignalUI(pair, signal);
+                        
+                        if (signal.direction && signal.confidence >= 70) {
+                            fireAlert(signal);
+                        }
+                    }
+                } catch (e) {
+                    // continue
+                }
+            }
+        }
+        
+        // ============================================
+        // UI UPDATES
+        // ============================================
+        
+        function updateSignalUI(pair, signal) {
+            const dirEl = document.getElementById(pair.toLowerCase() + 'Dir');
+            const condsEl = document.getElementById(pair.toLowerCase() + 'Conds');
+            const confEl = document.getElementById(pair.toLowerCase() + 'Conf');
+            const cardEl = document.getElementById(pair.toLowerCase() + 'Signal');
+            
+            if (!dirEl || !condsEl || !confEl || !cardEl) return;
+            
+            dirEl.textContent = signal.direction ? 
+                (signal.direction === 'BUY' ? '🟢 BUY' : '🔴 SELL') : '⏳ Waiting';
+            
+            condsEl.innerHTML = `
+                <div class="condition-line ${signal.conds.ema ? 'met' : 'pending'}">
+                    <span class="check">${signal.conds.ema ? '✅' : '○'}</span> EMA 21 Touch
+                </div>
+                <div class="condition-line ${signal.conds.ha ? 'met' : 'pending'}">
+                    <span class="check">${signal.conds.ha ? '✅' : '○'}</span> HA Color Change
+                </div>
+                <div class="condition-line ${signal.conds.stoch ? 'met' : 'pending'}">
+                    <span class="check">${signal.conds.stoch ? '✅' : '○'}</span> Stoch RSI
+                </div>
+                <div style="font-size:0.6em;color:#90a4ae;margin-top:2px;">
+                    P:${signal.price.toFixed(2)} E:${signal.details.ema21?.toFixed(2)||'--'} S:${signal.details.stoch?.toFixed(1)||'--'}
+                </div>
+            `;
+            
+            confEl.style.width = signal.confidence + '%';
+            confEl.style.background = signal.confidence >= 80 ? '#00e676' : 
+                                      signal.confidence >= 50 ? '#ff9100' : '#ff1744';
+            
+            cardEl.className = 'signal-card' + (signal.confidence >= 50 ? ' hot' : '');
+        }
+        
+        function fireAlert(signal) {
+            const overlay = document.getElementById('alertOverlay');
+            const card = document.getElementById('alertCard');
+            const symbol = document.getElementById('alertSymbol');
+            const pairEl = document.getElementById('alertPair');
+            const signalEl = document.getElementById('alertSignal');
+            const priceEl = document.getElementById('alertPrice');
+            
+            card.className = 'alert-card ' + signal.direction.toLowerCase();
+            symbol.textContent = signal.direction === 'BUY' ? '📈' : '📉';
+            pairEl.textContent = signal.pair;
+            signalEl.textContent = `${signal.direction} SIGNAL • ${signal.confidence}%`;
+            priceEl.textContent = `Entry: ${signal.price.toFixed(signal.pair==='XAUUSD'?2:3)} | EMA: ${signal.details.ema21?.toFixed(2)}`;
+            
+            overlay.classList.add('active');
+            
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200, 100, 400]);
+            }
+            
+            playBeep();
+            
+            if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                    navigator.serviceWorker.ready.then(reg => {
+                        reg.showNotification(`ICC ${signal.direction}: ${signal.pair}`, {
+                            body: `Entry ${signal.price.toFixed(2)} • ${signal.confidence}% confidence`,
+                            icon: '📈',
+                            vibrate: [200, 100, 200, 100, 400],
+                            tag: 'icc-alert',
+                            requireInteraction: true,
+                        });
+                    });
+                } catch(e) {
+                    new Notification(`ICC ${signal.direction}: ${signal.pair}`, {
+                        body: `Entry ${signal.price.toFixed(2)}`,
+                    });
+                }
+            }
+            
+            STATE.alerts++;
+            addLog(`🚨 ${signal.pair} ${signal.direction} @ ${signal.price.toFixed(2)} [${signal.confidence}%]`, 'alert');
+            
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 45000);
+        }
+        
+        function dismissAlert() {
+            document.getElementById('alertOverlay').classList.remove('active');
+        }
+        
+        function playBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                [800, 1000, 1200].forEach((f, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'square';
+                    osc.frequency.value = f;
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime + i*0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i*0.12+0.1);
+                    osc.start(ctx.currentTime + i*0.12);
+                    osc.stop(ctx.currentTime + i*0.12+0.1);
+                });
+            } catch(e) {}
+        }
+        
+        // ============================================
+        // TRADINGVIEW CHARTS
+        // ============================================
+        
+        function initCharts() {
+            createTVChart('xauusdChart', 'OANDA:XAUUSD');
+            createTVChart('gbpjpyChart', 'OANDA:GBPJPY');
+        }
+        
+        function createTVChart(containerId, symbol) {
+            document.getElementById(containerId).innerHTML = '';
+            new TradingView.widget({
+                container_id: containerId,
+                symbol: symbol,
+                interval: '1',
+                theme: 'dark',
+                style: '4',
+                locale: 'en',
+                toolbar_bg: '#131b2e',
+                enable_publishing: false,
+                hide_top_toolbar: true,
+                hide_legend: true,
+                save_image: false,
+                height: '100%',
+                width: '100%',
+                studies: ['MASimple@tv-basicstudies', 'StochRSI@tv-basicstudies'],
+                overrides: {
+                    'mainSeriesProperties.style': 4,
+                    'paneProperties.background': '#131b2e',
+                },
+                studies_overrides: {
+                    'moving average.ma.color': '#2962ff',
+                    'moving average.length': 21,
+                }
+            });
+        }
+        
+        // ============================================
+        // BOT CONTROLS
+        // ============================================
+        
+        function startBot() {
+            if (!OANDA.connected) {
+                showToast('Connect API first!');
+                return;
+            }
+            if (STATE.running) return;
+            
+            STATE.running = true;
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+            document.getElementById('statusBadge').textContent = '● LIVE';
+            
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            
+            addLog('🤖 Bot STARTED • 1m ICC Strategy', 'ok');
+            scan();
+            STATE.timer = setInterval(scan, OANDA.pollMs);
+            showToast('Monitoring started 📊');
+        }
+        
+        function stopBot() {
+            STATE.running = false;
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+            document.getElementById('statusBadge').textContent = '● ONLINE';
+            
+            if (STATE.timer) {
+                clearInterval(STATE.timer);
+                STATE.timer = null;
+            }
+            
+            addLog('⏹ Bot stopped', 'info');
+            showToast('Monitoring stopped');
+        }
+        
+        function testAlert() {
+            fireAlert({
+                pair: 'XAUUSD',
+                direction: 'BUY',
+                confidence: 85,
+                price: 2650.50,
+                details: { ema21: 2650.30, stoch: 18.5, haColor: 'green' },
+                conds: { ema: true, ha: true, stoch: 'oversold_rising' }
+            });
+        }
+        
+        // ============================================
+        // HELPERS
+        // ============================================
+        
+        function addLog(msg, type = 'info') {
+            const container = document.getElementById('logContent');
+            const line = document.createElement('div');
+            line.className = 'log-line ' + (type === 'alert' ? 'alert' : type === 'error' ? 'error' : type === 'ok' ? 'ok' : '');
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            container.insertBefore(line, container.firstChild);
+            while (container.children.length > 80) container.lastChild.remove();
+        }
+        
+        function showSpinner(show) {
+            document.getElementById('spinner').className = show ? 'spinner-overlay show' : 'spinner-overlay';
+        }
+        
+        // ============================================
+        // INIT
+        // ============================================
+        
+        function init() {
+            addLog('📱 ICC Strategy Bot v2.0', 'ok');
+            addLog('📐 HA + EMA21 + StochRSI (1m)', 'info');
+            
+            loadSavedCreds();
+            
+            try { initCharts(); } catch(e) {}
+            
+            // Show iOS install help
+            setTimeout(() => {
+                if (!window.matchMedia('(display-mode: standalone)').matches && !navigator.standalone) {
+                    const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+                    if (isIOS && !deferredPrompt) {
+                        const prompt = document.getElementById('installPrompt');
+                        prompt.textContent = '📲 iOS: Tap Share → Add to Home Screen';
+                        prompt.classList.add('show');
+                    }
+                }
+            }, 3000);
+        }
+        
+        window.addEventListener('load', init);
+        
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && STATE.running) {
+                addLog('📱 App backgrounded • still monitoring', 'info');
+            }
+        });
+    </script>
+</body>
+</html>
